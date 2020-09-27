@@ -19,15 +19,19 @@ can communicate with other programs on remote machines via a websocket if requir
 
 ## Installation
 
+Install Golang
 Git Clone https://github.com/ijl20/msfs_simconnect_go
-
-...
+```
+cd msfs_simconnect_go
+go build -ldflags "-s -w" ./vfrmap
+./vfrmap.exe
+```
 
 cross-compiles from macos/linux, no other dependencies required. produces a single binary with no other files or configuration required.
 
 ## Status
 
-[msfs2020-go/simconnect](simconnect/) package currently only implements enough of the simconnect api for [examples](examples/) and [vfrmap](vfrmap).
+[msfs_simconnect_go/simconnect](simconnect/) package currently only implements enough of the simconnect api for [examples](examples/) and [vfrmap](vfrmap).
 
 ## Releases and download
 

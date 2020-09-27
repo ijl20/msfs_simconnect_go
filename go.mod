@@ -1,4 +1,4 @@
-module github.com/lian/msfs2020-go
+module msfs_simconnect_go
 
 go 1.14
 

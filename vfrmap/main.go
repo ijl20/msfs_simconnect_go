@@ -16,9 +16,9 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/lian/msfs2020-go/simconnect"
-	"github.com/lian/msfs2020-go/vfrmap/html/leafletjs"
-	"github.com/lian/msfs2020-go/vfrmap/websockets"
+	"msfs_simconnect_go/simconnect"
+	"msfs_simconnect_go/vfrmap/html/leafletjs"
+	"msfs_simconnect_go/vfrmap/websockets"
 )
 
 type Report struct {
@@ -34,6 +34,9 @@ type Report struct {
 	Flaps         float64   `name:"TRAILING EDGE FLAPS LEFT ANGLE" unit:"degrees"`
 	Trim          float64   `name:"ELEVATOR TRIM PCT" unit:"percent"`
 	RudderTrim    float64   `name:"RUDDER TRIM PCT" unit:"percent"`
+	WindX         float64   `name:"AMBIENT WIND X" unit:"meters/second"`
+	WindY         float64   `name:"AMBIENT WIND Y" unit:"meters/second"`
+	WindZ         float64   `name:"AMBIENT WIND Z" unit:"meters/second"`
 }
 
 func (r *Report) RequestData(s *simconnect.SimConnect) {
@@ -96,54 +99,38 @@ var disableTeleport bool
 var verbose bool
 var httpListen string
 
+func connect_simconnect() (*simconnect.SimConnect, error) {
+	s, err := simconnect.New("msfs_simconnect_go/vfrmap")
+	if err != nil {
+        fmt.Println("FAILED to connect to flight simulator")
+	} else {
+	       fmt.Println("connected to flight simulator!")
+    }
+    return s, err
+}
+
 func main() {
 	flag.BoolVar(&verbose, "verbose", false, "verbose output")
 	flag.StringVar(&httpListen, "listen", "0.0.0.0:9000", "http listen")
 	flag.BoolVar(&disableTeleport, "disable-teleport", false, "disable teleport")
 	flag.Parse()
 
-	fmt.Printf("\nmsfs2020-go/vfrmap\n  readme: https://github.com/lian/msfs2020-go/blob/master/vfrmap/README.md\n  issues: https://github.com/lian/msfs2020-go/issues\n  version: %s (%s)\n\n", buildVersion, buildTime)
+	fmt.Printf("\nvfrmap  version: %s (%s)\n\n", buildVersion, buildTime)
 
 	exitSignal := make(chan os.Signal, 1)
 	signal.Notify(exitSignal, os.Interrupt, syscall.SIGTERM)
 	exePath, _ := os.Executable()
 
 	ws := websockets.New()
-
-	s, err := simconnect.New("msfs2020-go/vfrmap")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("connected to flight simulator!")
-
-	report := &Report{}
-	err = s.RegisterDataDefinition(report)
-	if err != nil {
-		panic(err)
-	}
-
+    report := &Report{}
 	trafficReport := &TrafficReport{}
-	err = s.RegisterDataDefinition(trafficReport)
-	if err != nil {
-		panic(err)
-	}
+    var eventSimStartID simconnect.DWORD
+    var startupTextEventID simconnect.DWORD
 
-	teleportReport := &TeleportRequest{}
-	err = s.RegisterDataDefinition(teleportReport)
-	if err != nil {
-		panic(err)
-	}
-
-	eventSimStartID := s.GetEventID()
-	//s.SubscribeToSystemEvent(eventSimStartID, "SimStart")
-	//s.SubscribeToFacilities(simconnect.FACILITY_LIST_TYPE_AIRPORT, s.GetDefineID(&simconnect.DataFacilityAirport{}))
-	//s.SubscribeToFacilities(simconnect.FACILITY_LIST_TYPE_WAYPOINT, s.GetDefineID(&simconnect.DataFacilityWaypoint{}))
-
-	startupTextEventID := s.GetEventID()
-	s.ShowText(simconnect.TEXT_TYPE_PRINT_WHITE, 15, startupTextEventID, "msfs2020-go/vfrmap connected")
-
+    // Start webserver as parellel thread
 	go func() {
 		app := func(w http.ResponseWriter, r *http.Request) {
+            fmt.Println("Serving file")
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 			w.Header().Set("Pragma", "no-cache")
@@ -152,7 +139,7 @@ func main() {
 
 			filePath := filepath.Join(filepath.Dir(exePath), "index.html")
 
-			if _, err = os.Stat(filePath); os.IsNotExist(err) {
+			if _, err := os.Stat(filePath); os.IsNotExist(err) {
 				w.Write(MustAsset(filepath.Base(filePath)))
 			} else {
 				fmt.Println("use local", filePath)
@@ -171,6 +158,37 @@ func main() {
 		}
 	}()
 
+    s, CONNECT_ERROR := connect_simconnect()
+
+    if CONNECT_ERROR == nil {
+    	err := s.RegisterDataDefinition(report)
+    	if err != nil {
+            fmt.Println("FAILED to register data definition for Report")
+    		panic(err)
+    	}
+
+    	err = s.RegisterDataDefinition(trafficReport)
+    	if err != nil {
+            fmt.Println("FAILED to register data definition for TrafficReport")
+    		panic(err)
+    	}
+
+    	teleportReport := &TeleportRequest{}
+    	err = s.RegisterDataDefinition(teleportReport)
+    	if err != nil {
+            fmt.Println("FAILED to register data definition for TeleportRequest")
+            panic(err)
+    	}
+
+    	eventSimStartID = s.GetEventID()
+    	//s.SubscribeToSystemEvent(eventSimStartID, "SimStart")
+    	//s.SubscribeToFacilities(simconnect.FACILITY_LIST_TYPE_AIRPORT, s.GetDefineID(&simconnect.DataFacilityAirport{}))
+    	//s.SubscribeToFacilities(simconnect.FACILITY_LIST_TYPE_WAYPOINT, s.GetDefineID(&simconnect.DataFacilityWaypoint{}))
+
+    	startupTextEventID = s.GetEventID()
+    	s.ShowText(simconnect.TEXT_TYPE_PRINT_WHITE, 15, startupTextEventID, "vfrmap connected")
+    }
+
 	simconnectTick := time.NewTicker(100 * time.Millisecond)
 	planePositionTick := time.NewTicker(200 * time.Millisecond)
 	trafficPositionTick := time.NewTicker(10000 * time.Millisecond)
@@ -178,6 +196,9 @@ func main() {
 	for {
 		select {
 		case <-planePositionTick.C:
+            if CONNECT_ERROR != nil {
+                continue
+            }
 			report.RequestData(s)
 
 		case <-trafficPositionTick.C:
@@ -187,6 +208,9 @@ func main() {
 			//s.RequestFacilitiesList(simconnect.FACILITY_LIST_TYPE_WAYPOINT, waypointRequestID)
 
 		case <-simconnectTick.C:
+            if CONNECT_ERROR != nil {
+                continue
+            }
 			ppData, r1, err := s.GetNextDispatch()
 
 			if r1 < 0 {
@@ -197,6 +221,8 @@ func main() {
 					panic(fmt.Errorf("GetNextDispatch error: %d %s", r1, err))
 				}
 			}
+
+            //fmt.Println("simconnectTick got message")
 
 			recvInfo := *(*simconnect.Recv)(ppData)
 
@@ -250,6 +276,9 @@ func main() {
 						fmt.Printf("REPORT: %#v\n", report)
 					}
 
+  				    fmt.Printf("Alt %.1f WindX,Y,Z %.1f %.1f %.1f\n", report.Altitude,
+                        report.WindX, report.WindY, report.WindZ)
+
 					ws.Broadcast(map[string]interface{}{
 						"type":           "plane",
 						"latitude":       report.Latitude,
@@ -262,6 +291,9 @@ func main() {
 						"flaps":          fmt.Sprintf("%.0f", report.Flaps),
 						"trim":           fmt.Sprintf("%.1f", report.Trim),
 						"rudder_trim":    fmt.Sprintf("%.1f", report.RudderTrim),
+						"wind_x":         fmt.Sprintf("%.1f", report.WindX),
+						"wind_y":         fmt.Sprintf("%.1f", report.WindY),
+						"wind_z":         fmt.Sprintf("%.1f", report.WindZ),
 					})
 
 				case s.DefineMap["TrafficReport"]:
@@ -275,7 +307,7 @@ func main() {
 
 		case <-exitSignal:
 			fmt.Println("exiting..")
-			if err = s.Close(); err != nil {
+			if err := s.Close(); err != nil {
 				panic(err)
 			}
 			os.Exit(0)

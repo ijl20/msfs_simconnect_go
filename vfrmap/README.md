@@ -1,12 +1,12 @@
-# msfs2020-go/vfrmap
+# msfs_simconnect_go/vfrmap
 
-local web-server using msfs2020-go/simconnect that will allow you to view your location, and some information about your trajectory including airspeed and altitude.
+local web-server using msfs_simconnect_go/simconnect that will allow you to view your location, and some information about your trajectory including airspeed and altitude.
 
 also allows you to quickly teleport your plane to any location.
 
 ## install
 
-* download latest release zip [here](https://github.com/lian/msfs2020-go/releases)
+* download latest release zip [here](https://github.com/ijl20/msfs_simconnect_go/releases)
 * unzip `vfrmap-win64.zip`
 
 ## run
@@ -38,13 +38,7 @@ earlier versions of this app used google maps directly, but this was too expensi
 
 ## compile
 
-`GOOS=windows GOARCH=amd64 go build github.com/lian/msfs2020-go/vfrmap` or see [build-vfrmap.sh](https://github.com/lian/msfs2020-go/blob/master/build-vfrmap.sh)
-
-## Why does my virus-scanning software think this program is infected?
-
-From official golang website https://golang.org/doc/faq#virus
-
-"This is a common occurrence, especially on Windows machines, and is almost always a false positive. Commercial virus scanning programs are often confused by the structure of Go binaries, which they don't see as often as those compiled from other languages."
+`GOOS=windows GOARCH=amd64 go build github.com/ijl20/msfs_simconnect_go/vfrmap` or see [build-vfrmap.sh](https://github.com/ijl20/msfs_simconnect_go/blob/master/build-vfrmap.sh)
 
 ## screenshots
 
